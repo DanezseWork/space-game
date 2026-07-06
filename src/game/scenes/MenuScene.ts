@@ -1,0 +1,227 @@
+import Phaser from 'phaser';
+import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { formatHighScoreLabel } from '../gameFlow';
+import { quitGame } from '../quitGame';
+import { getAutoFire } from '../settings';
+import { createMenuButton } from '../ui/MenuButtons';
+import { createSettingsPanel } from '../ui/SettingsPanel';
+
+export class MenuScene extends Phaser.Scene {
+  private quitOverlay?: Phaser.GameObjects.Container;
+  private settingsPanel?: Phaser.GameObjects.Container;
+  constructor() {
+    super({ key: 'MenuScene' });
+  }
+
+  create(): void {
+    this.cameras.main.fadeIn(400, 0, 0, 0);
+    this.createStarfield();
+    this.createTitle();
+    this.createHighScore();
+    this.createInstructions();
+    this.createActionButtons();
+
+    this.input.keyboard?.once('keydown-SPACE', () => this.openModeSelect());
+    this.input.keyboard?.once('keydown-ENTER', () => this.openModeSelect());
+  }
+
+  private createStarfield(): void {
+    for (let i = 0; i < 80; i++) {
+      const x = Phaser.Math.Between(0, GAME_WIDTH);
+      const y = Phaser.Math.Between(0, GAME_HEIGHT);
+      const star = this.add.image(x, y, 'star');
+      star.setAlpha(Phaser.Math.FloatBetween(0.2, 0.9));
+      star.setScale(Phaser.Math.FloatBetween(0.5, 1.5));
+      this.tweens.add({
+        targets: star,
+        alpha: { from: star.alpha, to: star.alpha * 0.3 },
+        duration: Phaser.Math.Between(1000, 3000),
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+  }
+
+  private createTitle(): void {
+    const title = this.add.text(GAME_WIDTH / 2, 180, 'STAR\nBLASTER', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '48px',
+      fontStyle: '900',
+      color: '#00d4ff',
+      align: 'center',
+      stroke: '#003344',
+      strokeThickness: 4,
+    });
+    title.setOrigin(0.5);
+
+    this.tweens.add({
+      targets: title,
+      y: title.y - 8,
+      duration: 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private createHighScore(): void {
+    this.add.text(GAME_WIDTH / 2, 300, formatHighScoreLabel(), {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '16px',
+      color: '#ffcc00',
+    }).setOrigin(0.5);
+  }
+
+  private createInstructions(): void {
+    const isMobile = this.sys.game.device.input.touch;
+    const moveText = isMobile
+      ? 'Drag to fly your rocket'
+      : 'WASD or arrows to move';
+    const shootText = getAutoFire() ? 'Auto-fire enabled' : 'Space / FIRE to shoot';
+
+    this.add.text(GAME_WIDTH / 2, 400, `${moveText}\n${shootText}\nDodge & destroy asteroids\nEsc to pause`, {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '14px',
+      color: '#8899bb',
+      align: 'center',
+      lineSpacing: 12,
+    }).setOrigin(0.5);
+  }
+
+  private createActionButtons(): void {
+    const btnHeight = 48;
+    const gap = 20;
+    const bottomPad = 48;
+
+    const quitY = GAME_HEIGHT - bottomPad - btnHeight / 2;
+    const settingsY = quitY - btnHeight - gap;
+    const launchY = settingsY - btnHeight - gap;
+
+    const { container: launchBtn } = createMenuButton(this, {
+      label: 'LAUNCH',
+      y: launchY,
+      onClick: () => this.openModeSelect(),
+    });
+    launchBtn.setX(GAME_WIDTH / 2);
+    this.tweens.add({
+      targets: launchBtn,
+      scaleX: 1.05,
+      scaleY: 1.05,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    const { container: settingsBtn } = createMenuButton(this, {
+      label: 'SETTINGS',
+      y: settingsY,
+      color: 0x8899bb,
+      onClick: () => this.showSettingsPanel(),
+    });
+    settingsBtn.setX(GAME_WIDTH / 2);
+
+    const { container: quitBtn } = createMenuButton(this, {
+      label: 'QUIT',
+      y: quitY,
+      color: 0xff4466,
+      onClick: () => this.showQuitConfirm(),
+    });
+    quitBtn.setX(GAME_WIDTH / 2);
+  }
+
+  private showSettingsPanel(): void {
+    if (this.settingsPanel || this.quitOverlay) return;
+
+    const panel = createSettingsPanel(this, 300, {
+      onBack: () => {
+        panel.destroy();
+        this.settingsPanel = undefined;
+      },
+    });
+    this.settingsPanel = panel.root;
+  }
+
+  private showQuitConfirm(): void {
+    if (this.quitOverlay) return;
+
+    const root = this.add.container(0, 0).setDepth(300);
+
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      0x000000,
+      0.8,
+    );
+    root.add(overlay);
+
+    const prompt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, 'Quit game?', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '22px',
+      fontStyle: '700',
+      color: '#00d4ff',
+    }).setOrigin(0.5);
+    root.add(prompt);
+
+    const { container: yesBtn } = createMenuButton(this, {
+      label: 'YES',
+      y: GAME_HEIGHT / 2 + 10,
+      color: 0xff4466,
+      onClick: () => this.showQuitFarewell(root),
+    });
+    yesBtn.setX(GAME_WIDTH / 2);
+    root.add(yesBtn);
+
+    const { container: noBtn } = createMenuButton(this, {
+      label: 'NO',
+      y: GAME_HEIGHT / 2 + 74,
+      onClick: () => {
+        root.destroy();
+        this.quitOverlay = undefined;
+      },
+    });
+    noBtn.setX(GAME_WIDTH / 2);
+    root.add(noBtn);
+
+    this.quitOverlay = root;
+  }
+
+  private showQuitFarewell(root: Phaser.GameObjects.Container): void {
+    root.removeAll(true);
+
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      0x000000,
+      0.8,
+    );
+    root.add(overlay);
+
+    const message = this.add.text(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      'Thanks for Playing!\nClose this tab to exit.',
+      {
+        fontFamily: 'Orbitron, sans-serif',
+        fontSize: '16px',
+        color: '#8899bb',
+        align: 'center',
+        lineSpacing: 10,
+      },
+    ).setOrigin(0.5);
+    root.add(message);
+
+    quitGame();
+  }
+
+  private openModeSelect(): void {
+    this.cameras.main.fadeOut(400, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('ModeSelectScene');
+    });
+  }
+}
