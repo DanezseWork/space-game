@@ -47,7 +47,9 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(8);
     this.setVelocity(0, config.velocityY);
 
-    if (config.health >= 100) {
+    if (config.health >= 150) {
+      this.setScale(1.3);
+    } else if (config.health >= 100) {
       this.setScale(1.15);
     }
   }

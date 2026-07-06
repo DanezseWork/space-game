@@ -1089,7 +1089,11 @@ export class GameScene extends Phaser.Scene {
 
     root.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8));
 
-    root.add(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, `STAGE ${this.storyLevel} CLEAR!`, {
+    const victoryTitle = this.storyLevel === getMaxLevelSlots()
+      ? 'STORY COMPLETE!'
+      : `STAGE ${this.storyLevel} CLEAR!`;
+
+    root.add(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, victoryTitle, {
       fontFamily: 'Orbitron, sans-serif',
       fontSize: '32px',
       fontStyle: '900',

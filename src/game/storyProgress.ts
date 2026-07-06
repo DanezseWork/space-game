@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'star-blaster-story-progress';
-const MAX_LEVEL = 5;
+const MAX_LEVEL = 10;
 
 function readUnlocked(): number[] {
   try {
