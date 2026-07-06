@@ -34,8 +34,9 @@ export class BossHealthBar extends Phaser.GameObjects.Container {
     this.setVisible(false);
   }
 
-  show(maxHp: number, currentHp: number): void {
+  show(maxHp: number, currentHp: number, bossName?: string): void {
     this.maxHp = Math.max(1, maxHp);
+    this.label.setText(bossName?.toUpperCase() ?? 'BOSS');
     this.setVisible(true);
     this.setHp(currentHp);
   }

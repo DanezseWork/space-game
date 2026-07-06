@@ -1,5 +1,7 @@
+import { getWorld1LevelCount } from './world1/levels';
+
 const STORAGE_KEY = 'star-blaster-story-progress';
-const MAX_LEVEL = 10;
+const MAX_LEVEL = getWorld1LevelCount();
 
 function readUnlocked(): number[] {
   try {

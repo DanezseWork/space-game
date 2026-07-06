@@ -1,41 +1,56 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import type { BossLevelConfig } from '../levelConfig';
+import type { BossDefinition } from '../world1/bosses';
 
 export type BossFireCallback = (x: number, y: number, angle: number) => void;
+export type BossSpecialCallback = () => void;
 
 export class BossShip extends Phaser.Physics.Arcade.Sprite {
   health: number;
   readonly maxHealth: number;
   readonly bodyDamage: number;
   readonly points: number;
+  readonly definition: BossDefinition;
+  readonly bossName: string;
+
   private readonly fireCooldown: number;
   private readonly fanEvery: number;
   private readonly fanSpreadRad: number;
   private readonly fanCount: number;
   private readonly velocityY: number;
+  private readonly driftX: number;
   private lastFired = 0;
   private fanShotCounter = 0;
+  private driftDir = 1;
+
+  private specialCooldownAt = 0;
+  private chargeStartedAt = 0;
+  private charging = false;
 
   constructor(
     scene: Phaser.Scene,
     x: number,
     y: number,
-    config: BossLevelConfig,
+    definition: BossDefinition,
     private onFire: BossFireCallback,
+    private onSpecial: BossSpecialCallback,
     healthOverride?: number,
+    maxHealthOverride?: number,
   ) {
     super(scene, x, y, 'boss-ship');
 
-    this.maxHealth = config.health;
-    this.health = healthOverride ?? config.health;
-    this.velocityY = config.velocityY;
-    this.bodyDamage = config.bodyDamage;
-    this.points = config.points;
-    this.fireCooldown = config.fireCooldown;
-    this.fanEvery = config.fanEvery;
-    this.fanSpreadRad = (config.fanSpreadDeg * Math.PI) / 180;
-    this.fanCount = config.fanCount;
+    this.definition = definition;
+    this.bossName = definition.bossName;
+    this.maxHealth = maxHealthOverride ?? healthOverride ?? definition.baseHealth;
+    this.health = healthOverride ?? this.maxHealth;
+    this.velocityY = definition.velocityY;
+    this.driftX = definition.driftX;
+    this.bodyDamage = definition.bodyDamage;
+    this.points = definition.points;
+    this.fireCooldown = definition.fireCooldown;
+    this.fanEvery = definition.fanEvery;
+    this.fanSpreadRad = (definition.fanSpreadDeg * Math.PI) / 180;
+    this.fanCount = definition.fanCount;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -45,16 +60,20 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
 
     this.setCircle(28);
     this.setDepth(8);
-    this.setVelocity(0, config.velocityY);
+    this.setVelocity(definition.driftX, definition.velocityY);
+    this.clearTint();
 
-    if (config.health >= 150) {
+    if (this.maxHealth >= 300) {
       this.setScale(1.3);
-    } else if (config.health >= 100) {
+    } else if (this.maxHealth >= 200) {
       this.setScale(1.15);
     }
+
+    this.specialCooldownAt = scene.time.now + definition.special.cooldownMs;
   }
 
   tryFire(time: number, targetX: number, targetY: number): void {
+    if (this.charging) return;
     if (time < this.lastFired + this.fireCooldown) return;
 
     this.lastFired = time;
@@ -71,6 +90,52 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.onFire(this.x, this.y, baseAngle);
     }
+  }
+
+  updateMovement(): void {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const minY = 90;
+    const maxY = GAME_HEIGHT * 0.42;
+
+    if (this.y < minY) {
+      body.setVelocityY(Math.max(this.velocityY, 40));
+    } else if (this.y > maxY) {
+      body.setVelocityY(-Math.abs(this.velocityY) * 0.5);
+    } else if (body.velocity.y === 0) {
+      body.setVelocityY(this.velocityY);
+    }
+
+    if (this.driftX !== 0) {
+      if (this.x <= 60) this.driftDir = 1;
+      if (this.x >= GAME_WIDTH - 60) this.driftDir = -1;
+      body.setVelocityX(this.driftX * this.driftDir);
+    }
+  }
+
+  updateSpecial(time: number): void {
+    const special = this.definition.special;
+
+    if (this.charging) {
+      if (time >= this.chargeStartedAt + special.chargeMs) {
+        this.charging = false;
+        this.specialCooldownAt = time + special.cooldownMs;
+        this.onSpecial();
+      }
+      return;
+    }
+
+    if (time >= this.specialCooldownAt) {
+      this.charging = true;
+      this.chargeStartedAt = time;
+    }
+  }
+
+  isCharging(): boolean {
+    return this.charging;
+  }
+
+  getSpecialName(): string {
+    return this.definition.special.name;
   }
 
   takeDamage(amount: number): boolean {
@@ -96,7 +161,7 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
   }
 
   respawnFromTop(): void {
-    this.setPosition(GAME_WIDTH / 2, -50);
-    this.setVelocity(0, this.velocityY);
+    this.setPosition(GAME_WIDTH / 2, 100);
+    this.setVelocity(this.driftX * this.driftDir, this.velocityY);
   }
 }

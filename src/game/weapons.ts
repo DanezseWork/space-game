@@ -143,6 +143,15 @@ export function rollWeaponChoices(ownedIds: string[], count = 3): Weapon[] {
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
+export function computePlayerPowerScore(loadout: WeaponLoadout, weaponCount: number): number {
+  const pattern = buildFirePattern(loadout);
+  const shotsPerVolley = pattern.length;
+  const fireRateFactor = 180 / loadout.fireCooldownMs;
+  const dpsScore = shotsPerVolley * loadout.bulletDamage * fireRateFactor;
+  const weaponBonus = weaponCount * 1.5;
+  return dpsScore + weaponBonus;
+}
+
 export function buildFirePattern(loadout: WeaponLoadout): BulletSpawn[] {
   const shots: BulletSpawn[] = [];
   const baseAngle = -Math.PI / 2;

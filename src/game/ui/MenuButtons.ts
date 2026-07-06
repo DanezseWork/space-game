@@ -39,12 +39,17 @@ export function createMenuButton(
   }).setOrigin(0.5);
 
   container.add([bg, label]);
-  container.setSize(220, 48);
-  container.setInteractive({ useHandCursor: true });
+  container.setInteractive(
+    new Phaser.Geom.Rectangle(-110, -24, 220, 48),
+    Phaser.Geom.Rectangle.Contains,
+  );
+  container.input!.cursor = 'pointer';
 
   container.on('pointerover', () => drawBg(0.3, 1));
   container.on('pointerout', () => drawBg(0.15, 0.8));
-  container.on('pointerup', config.onClick);
+  container.on('pointerup', (_pointer: Phaser.Input.Pointer) => {
+    config.onClick();
+  });
 
   return {
     container,

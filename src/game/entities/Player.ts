@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import {
   buildFirePattern,
+  computePlayerPowerScore,
   createDefaultLoadout,
   getWeaponById,
   type BulletSpawn,
@@ -70,6 +71,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   getFireCooldownMs(): number {
     return this.loadout.fireCooldownMs;
+  }
+
+  getLoadout(): WeaponLoadout {
+    return { ...this.loadout };
+  }
+
+  getPowerScore(): number {
+    return computePlayerPowerScore(this.loadout, this.ownedWeaponIds.length);
   }
 
   private createThruster(): void {

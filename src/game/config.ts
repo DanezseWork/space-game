@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
+import { WorldSelectScene } from './scenes/WorldSelectScene';
 import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { GameScene } from './scenes/GameScene';
 
@@ -28,5 +29,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   input: {
     activePointers: 3,
   },
-  scene: [BootScene, MenuScene, ModeSelectScene, LevelSelectScene, GameScene],
+  scene: [BootScene, MenuScene, ModeSelectScene, WorldSelectScene, LevelSelectScene, GameScene],
 };

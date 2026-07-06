@@ -17,7 +17,7 @@ export function goToLevelSelect(scene: Phaser.Scene): void {
 
   scene.cameras.main.fadeOut(300, 0, 0, 0);
   scene.cameras.main.once('camerafadeoutcomplete', () => {
-    scene.scene.start('LevelSelectScene');
+    scene.scene.start('LevelSelectScene', { worldId: 'world1' });
   });
 }
 

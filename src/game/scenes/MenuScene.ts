@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { applyAudioSettings, initAudio, playSfx, startMusic } from '../audioManager';
 import { formatHighScoreLabel } from '../gameFlow';
 import { quitGame } from '../quitGame';
 import { getAutoFire } from '../settings';
@@ -21,8 +22,16 @@ export class MenuScene extends Phaser.Scene {
     this.createInstructions();
     this.createActionButtons();
 
-    this.input.keyboard?.once('keydown-SPACE', () => this.openModeSelect());
-    this.input.keyboard?.once('keydown-ENTER', () => this.openModeSelect());
+    this.input.keyboard?.once('keydown-SPACE', () => {
+      initAudio();
+      startMusic();
+      this.openModeSelect();
+    });
+    this.input.keyboard?.once('keydown-ENTER', () => {
+      initAudio();
+      startMusic();
+      this.openModeSelect();
+    });
   }
 
   private createStarfield(): void {
@@ -100,7 +109,12 @@ export class MenuScene extends Phaser.Scene {
     const { container: launchBtn } = createMenuButton(this, {
       label: 'LAUNCH',
       y: launchY,
-      onClick: () => this.openModeSelect(),
+      onClick: () => {
+        initAudio();
+        playSfx('ui');
+        startMusic();
+        this.openModeSelect();
+      },
     });
     launchBtn.setX(GAME_WIDTH / 2);
     this.tweens.add({
@@ -117,7 +131,11 @@ export class MenuScene extends Phaser.Scene {
       label: 'SETTINGS',
       y: settingsY,
       color: 0x8899bb,
-      onClick: () => this.showSettingsPanel(),
+      onClick: () => {
+        initAudio();
+        playSfx('ui');
+        this.showSettingsPanel();
+      },
     });
     settingsBtn.setX(GAME_WIDTH / 2);
 
@@ -138,6 +156,8 @@ export class MenuScene extends Phaser.Scene {
         panel.destroy();
         this.settingsPanel = undefined;
       },
+      onSoundVolumeChange: () => applyAudioSettings(),
+      onMusicVolumeChange: () => applyAudioSettings(),
     });
     this.settingsPanel = panel.root;
   }
@@ -219,6 +239,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private openModeSelect(): void {
+    initAudio();
+    startMusic();
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('ModeSelectScene');

@@ -1,11 +1,22 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { getAutoFire, getFireModeLabel, toggleAutoFire } from '../settings';
+import {
+  getAutoFire,
+  getFireModeLabel,
+  getMusicVolume,
+  getSoundVolume,
+  setMusicVolume,
+  setSoundVolume,
+  toggleAutoFire,
+} from '../settings';
 import { createMenuButton } from './MenuButtons';
+import { createVolumeSlider } from './VolumeSlider';
 
 export interface SettingsPanelOptions {
   onBack: () => void;
   onAutoFireChange?: (autoFire: boolean) => void;
+  onSoundVolumeChange?: (volume: number) => void;
+  onMusicVolumeChange?: (volume: number) => void;
 }
 
 export interface SettingsPanelResult {
@@ -30,7 +41,7 @@ export function createSettingsPanel(
   );
   root.add(overlay);
 
-  const title = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, 'SETTINGS', {
+  const title = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'SETTINGS', {
     fontFamily: 'Orbitron, sans-serif',
     fontSize: '32px',
     fontStyle: '900',
@@ -39,14 +50,14 @@ export function createSettingsPanel(
   root.add(title);
 
   root.add(
-    scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'Firing mode', {
+    scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 145, 'Firing mode', {
       fontFamily: 'Orbitron, sans-serif',
       fontSize: '14px',
       color: '#8899bb',
     }).setOrigin(0.5),
   );
 
-  const modeText = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, getFireModeLabel(), {
+  const modeText = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, getFireModeLabel(), {
     fontFamily: 'Orbitron, sans-serif',
     fontSize: '20px',
     fontStyle: '700',
@@ -56,11 +67,11 @@ export function createSettingsPanel(
 
   const hint = scene.add.text(
     GAME_WIDTH / 2,
-    GAME_HEIGHT / 2 + 90,
+    GAME_HEIGHT / 2 - 88,
     getAutoFire() ? 'Ship fires continuously' : 'Press Space or tap FIRE to shoot',
     {
       fontFamily: 'Orbitron, sans-serif',
-      fontSize: '12px',
+      fontSize: '11px',
       color: '#556677',
       align: 'center',
     },
@@ -69,7 +80,7 @@ export function createSettingsPanel(
 
   const { container: toggleBtn } = createMenuButton(scene, {
     label: 'TOGGLE AUTO / MANUAL',
-    y: GAME_HEIGHT / 2 + 30,
+    y: GAME_HEIGHT / 2 - 40,
     color: 0xffcc00,
     onClick: () => {
       const autoFire = toggleAutoFire();
@@ -83,9 +94,40 @@ export function createSettingsPanel(
   toggleBtn.setX(GAME_WIDTH / 2);
   root.add(toggleBtn);
 
+  const { container: soundSlider } = createVolumeSlider(scene, {
+    label: 'SOUND',
+    value: getSoundVolume(),
+    onChange: (volume) => {
+      const next = setSoundVolume(volume);
+      options.onSoundVolumeChange?.(next);
+    },
+  });
+  soundSlider.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 35);
+  root.add(soundSlider);
+
+  const { container: musicSlider } = createVolumeSlider(scene, {
+    label: 'MUSIC',
+    value: getMusicVolume(),
+    onChange: (volume) => {
+      const next = setMusicVolume(volume);
+      options.onMusicVolumeChange?.(next);
+    },
+  });
+  musicSlider.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 105);
+  root.add(musicSlider);
+
+  root.add(
+    scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 150, 'Drag sliders or scroll to adjust (0–100)', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '10px',
+      color: '#445566',
+      align: 'center',
+    }).setOrigin(0.5),
+  );
+
   const { container: backBtn } = createMenuButton(scene, {
     label: 'BACK',
-    y: GAME_HEIGHT / 2 + 160,
+    y: GAME_HEIGHT / 2 + 205,
     onClick: () => options.onBack(),
   });
   backBtn.setX(GAME_WIDTH / 2);

@@ -9,8 +9,14 @@ import { SeekerDrone, SEEKER_BODY_DAMAGE } from '../entities/SeekerDrone';
 import { KamikazeWasp, WASP_BODY_DAMAGE } from '../entities/KamikazeWasp';
 import { PlasmaTurret, TURRET_BODY_DAMAGE } from '../entities/PlasmaTurret';
 import { BossShip } from '../entities/BossShip';
-import { getBossConfigForLevel, getBossSpawnMsForLevel, type BossLevelConfig } from '../levelConfig';
-import { isEnemyLaserOffScreen, LASER_DAMAGE, spawnEnemyLaser } from '../entities/EnemyLaser';
+import { getBossConfigForLevel, getBossSpawnMsForLevel } from '../levelConfig';
+import { computeBossHealth } from '../bossHealth';
+import {
+  BOSS_SPECIAL_DAMAGE,
+  getBossDefinition,
+  type BossDefinition,
+} from '../world1/bosses';
+import { isEnemyLaserOffScreen, LASER_DAMAGE, spawnEnemyLaser, type EnemyLaserOptions } from '../entities/EnemyLaser';
 import { HealthBar, MAX_HP } from '../ui/HealthBar';
 import { BossHealthBar } from '../ui/BossHealthBar';
 import {
@@ -39,6 +45,10 @@ import {
 } from '../gameFlow';
 import { addCoins } from '../coins';
 import { unlockLevel, isLevelUnlocked, getMaxLevelSlots } from '../storyProgress';
+import { getWorld1Level } from '../world1/levels';
+import { getBackgroundTheme } from '../world1/backgrounds';
+import { applyStoryBackground } from '../ui/StoryThemeBackground';
+import { applyAudioSettings, initAudio, pauseMusic, playSfx, resumeMusic, startMusic } from '../audioManager';
 import { normalizeGameSceneData, type GameMode } from '../gameMode';
 import { getAutoFire } from '../settings';
 import { createSettingsPanel } from '../ui/SettingsPanel';
@@ -108,8 +118,11 @@ export class GameScene extends Phaser.Scene {
   private timeText?: Phaser.GameObjects.Text;
   private victoryMenu?: Phaser.GameObjects.Container;
   private lastBossCoinReward = 0;
-  private activeBossConfig: BossLevelConfig | null = null;
+  private activeBossDefinition: BossDefinition | null = null;
+  private bossMaxHealth = 0;
   private bossHealthRemaining = 0;
+  private bossChargeRing?: Phaser.GameObjects.Graphics;
+  private bossSkillText?: Phaser.GameObjects.Text;
 
   private touchTarget: Phaser.Math.Vector2 | null = null;
   private isDragging = false;
@@ -163,8 +176,13 @@ export class GameScene extends Phaser.Scene {
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossActive = false;
-    this.activeBossConfig = null;
+    this.activeBossDefinition = null;
+    this.bossMaxHealth = 0;
     this.bossHealthRemaining = 0;
+    this.bossChargeRing?.destroy();
+    this.bossChargeRing = undefined;
+    this.bossSkillText?.destroy();
+    this.bossSkillText = undefined;
     this.victoryMenu?.destroy();
     this.victoryMenu = undefined;
     this.autoFire = getAutoFire();
@@ -172,11 +190,18 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     this.createStarfield();
+    if (this.gameMode === 'story') {
+      const theme = getBackgroundTheme(getWorld1Level(this.storyLevel).themeId);
+      applyStoryBackground(this, GAME_WIDTH, GAME_HEIGHT, theme);
+    }
     this.createGroups();
     this.createPlayer();
     this.createUI();
     this.setupInput();
     this.setupCollisions();
+
+    initAudio();
+    startMusic();
 
     this.spawnAsteroid('lg');
     for (let i = 0; i < 4; i++) {
@@ -188,13 +213,18 @@ export class GameScene extends Phaser.Scene {
     this.stars = [];
     this.starSpeeds = [];
 
+    const starTint = this.gameMode === 'story'
+      ? getBackgroundTheme(getWorld1Level(this.storyLevel).themeId).starColor
+      : 0xffffff;
+
     for (let i = 0; i < 80; i++) {
       const x = Phaser.Math.Between(0, GAME_WIDTH);
       const y = Phaser.Math.Between(0, GAME_HEIGHT);
       const star = this.add.image(x, y, 'star');
+      star.setTint(starTint);
       star.setAlpha(Phaser.Math.FloatBetween(0.2, 0.8));
       star.setScale(Phaser.Math.FloatBetween(0.5, 2));
-      star.setDepth(-2);
+      star.setDepth(-1);
       this.stars.push(star);
       this.starSpeeds.push(Phaser.Math.FloatBetween(40, 140));
     }
@@ -248,11 +278,21 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(hudTextDepth);
 
     if (this.gameMode === 'story') {
+      const levelMeta = getWorld1Level(this.storyLevel);
+      const theme = getBackgroundTheme(levelMeta.themeId);
+
       this.timeText = this.add.text(16, 32, 'TIME 0:00', {
         fontFamily: 'Orbitron, sans-serif',
         fontSize: '11px',
         color: '#8899bb',
       }).setScrollFactor(0).setDepth(hudTextDepth);
+
+      this.add.text(GAME_WIDTH - 16, 12, levelMeta.location.toUpperCase(), {
+        fontFamily: 'Orbitron, sans-serif',
+        fontSize: '10px',
+        fontStyle: '700',
+        color: `#${theme.accentColor.toString(16).padStart(6, '0')}`,
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(hudTextDepth);
     }
 
     this.healthBar = new HealthBar(this, GAME_WIDTH / 2, 58);
@@ -616,7 +656,8 @@ export class GameScene extends Phaser.Scene {
     const fromX = laser.x;
     const fromY = laser.y;
     laser.destroy();
-    this.takeLaserDamage(LASER_DAMAGE, fromX, fromY);
+    const damage = (laser.getData('damage') as number) ?? LASER_DAMAGE;
+    this.takeLaserDamage(damage, fromX, fromY);
   }
 
   private onPlayerHitSpider(
@@ -697,13 +738,37 @@ export class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.time.paused = true;
     this.tweens.pauseAll();
+    pauseMusic();
 
-    this.pauseMenu = createMenuOverlay(this, 'PAUSED', [
+    const pauseButtons = [
       { label: 'CONTINUE', y: 0, onClick: () => this.resumeGame() },
-      { label: 'RESTART', y: 0, color: 0xffcc00, onClick: () => restartGame(this, this.score, this.gameMode, this.storyLevel) },
+      {
+        label: 'RESTART',
+        y: 0,
+        color: 0xffcc00,
+        onClick: () => restartGame(this, this.score, this.gameMode, this.storyLevel),
+      },
+    ];
+
+    if (this.gameMode === 'story') {
+      pauseButtons.push({
+        label: 'LEVEL SELECT',
+        y: 0,
+        color: 0x8899bb,
+        onClick: () => this.quitToLevelSelect(),
+      });
+    }
+
+    pauseButtons.push(
       { label: 'SETTINGS', y: 0, color: 0x8899bb, onClick: () => this.showSettingsFromPause() },
       { label: 'QUIT', y: 0, color: 0xff4466, onClick: () => this.quitToTitle() },
-    ], 250);
+    );
+
+    const buttonStartY = this.gameMode === 'story'
+      ? GAME_HEIGHT / 2 - 20
+      : GAME_HEIGHT / 2 - 40;
+
+    this.pauseMenu = createMenuOverlay(this, 'PAUSED', pauseButtons, 200, buttonStartY);
   }
 
   private showSettingsFromPause(): void {
@@ -716,6 +781,8 @@ export class GameScene extends Phaser.Scene {
         this.pauseMenu?.setVisible(true);
       },
       onAutoFireChange: (autoFire) => this.applyFireMode(autoFire),
+      onSoundVolumeChange: () => applyAudioSettings(),
+      onMusicVolumeChange: () => applyAudioSettings(),
     });
     this.settingsPanel = panel.root;
   }
@@ -731,6 +798,7 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = false;
     this.tweens.resumeAll();
     this.physics.resume();
+    resumeMusic();
   }
 
   private quitToTitle(): void {
@@ -740,6 +808,15 @@ export class GameScene extends Phaser.Scene {
     this.settingsPanel?.destroy();
     this.settingsPanel = undefined;
     saveScoreAndGoToTitle(this, this.score, this.gameMode);
+  }
+
+  private quitToLevelSelect(): void {
+    this.isPaused = false;
+    this.pauseMenu?.destroy();
+    this.pauseMenu = undefined;
+    this.settingsPanel?.destroy();
+    this.settingsPanel = undefined;
+    goToLevelSelect(this);
   }
 
   private onPlayerHitAsteroid(
@@ -1060,7 +1137,11 @@ export class GameScene extends Phaser.Scene {
 
     this.bossDefeated = true;
     this.bossActive = false;
-    this.activeBossConfig = null;
+    this.activeBossDefinition = null;
+    this.bossChargeRing?.destroy();
+    this.bossChargeRing = undefined;
+    this.bossSkillText?.destroy();
+    this.bossSkillText = undefined;
     this.bossHealthBar.hide();
     this.triggerVictory();
   }
@@ -1089,9 +1170,10 @@ export class GameScene extends Phaser.Scene {
 
     root.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8));
 
+    const levelMeta = getWorld1Level(this.storyLevel);
     const victoryTitle = this.storyLevel === getMaxLevelSlots()
       ? 'STORY COMPLETE!'
-      : `STAGE ${this.storyLevel} CLEAR!`;
+      : `${levelMeta.location.toUpperCase()} CLEAR!`;
 
     root.add(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, victoryTitle, {
       fontFamily: 'Orbitron, sans-serif',
@@ -1135,35 +1217,40 @@ export class GameScene extends Phaser.Scene {
     root.add(selectBtn);
   }
 
-  private createBossInstance(config: BossLevelConfig, health?: number): BossShip {
+  private createBossInstance(definition: BossDefinition, health?: number, maxHealth?: number): BossShip {
     const boss = new BossShip(
       this,
       GAME_WIDTH / 2,
-      -50,
-      config,
+      100,
+      definition,
       (lx, ly, angle) => this.fireEnemyLaser(lx, ly, angle),
+      () => this.fireBossSpecial(boss),
       health,
+      maxHealth,
     );
     this.bossShips.add(boss);
-    boss.setVelocity(0, config.velocityY);
     this.bossHealthRemaining = boss.health;
-    this.bossHealthBar.show(boss.maxHealth, boss.health);
+    this.bossHealthBar.show(boss.maxHealth, boss.health, definition.bossName);
     return boss;
   }
 
   private spawnBoss(): void {
     if (this.bossSpawned || this.bossDefeated || this.bossShips.countActive(true) > 0) return;
 
-    const config = getBossConfigForLevel(this.storyLevel);
-    this.activeBossConfig = config;
-    this.lastBossCoinReward = config.coinReward;
+    const levelConfig = getBossConfigForLevel(this.storyLevel);
+    const definition = getBossDefinition(this.storyLevel);
+    const scaledHealth = computeBossHealth(definition.baseHealth, this.player.getPowerScore());
+
+    this.activeBossDefinition = definition;
+    this.bossMaxHealth = scaledHealth;
+    this.lastBossCoinReward = levelConfig.coinReward;
     this.bossSpawned = true;
     this.bossActive = true;
 
-    this.createBossInstance(config);
+    this.createBossInstance(definition, scaledHealth, scaledHealth);
 
     this.cameras.main.shake(400, 0.012);
-    const warning = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 'BOSS INCOMING', {
+    const warning = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, definition.bossName.toUpperCase(), {
       fontFamily: 'Orbitron, sans-serif',
       fontSize: '24px',
       fontStyle: '900',
@@ -1178,9 +1265,142 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private fireBossSpecial(boss: BossShip): void {
+    const special = boss.definition.special;
+    const tx = this.player.x;
+    const ty = this.player.y;
+    const baseAngle = Phaser.Math.Angle.Between(boss.x, boss.y, tx, ty);
+    const specialOpts: EnemyLaserOptions = {
+      damage: BOSS_SPECIAL_DAMAGE,
+      isSpecial: true,
+    };
+
+    const fireSpecial = (angle: number, speed = 240) => {
+      spawnEnemyLaser(this.enemyLasers, boss.x, boss.y, angle, { ...specialOpts, speed });
+    };
+
+    switch (special.pattern) {
+      case 'beam':
+        fireSpecial(baseAngle, 300);
+        break;
+      case 'fan': {
+        const spread = (special.spreadDeg ?? 28) * (Math.PI / 180);
+        const count = special.count ?? 3;
+        const half = (count - 1) / 2;
+        for (let i = 0; i < count; i++) {
+          const t = half === 0 ? 0 : (i / half) - 1;
+          fireSpecial(baseAngle + t * spread, 260);
+        }
+        break;
+      }
+      case 'ring': {
+        const count = special.count ?? 8;
+        for (let i = 0; i < count; i++) {
+          fireSpecial((i / count) * Math.PI * 2, 200);
+        }
+        break;
+      }
+      case 'solarFan': {
+        const spread = (special.spreadDeg ?? 50) * (Math.PI / 180);
+        const count = special.count ?? 5;
+        const down = Math.PI / 2;
+        const half = (count - 1) / 2;
+        for (let i = 0; i < count; i++) {
+          const t = half === 0 ? 0 : (i / half) - 1;
+          fireSpecial(down + t * spread, 220);
+        }
+        break;
+      }
+      case 'tripleLine': {
+        const tight = 6 * (Math.PI / 180);
+        fireSpecial(baseAngle - tight, 280);
+        fireSpecial(baseAngle, 280);
+        fireSpecial(baseAngle + tight, 280);
+        break;
+      }
+      case 'sniper':
+        fireSpecial(baseAngle, 360);
+        break;
+      case 'heavyTriple': {
+        const spread = 10 * (Math.PI / 180);
+        fireSpecial(baseAngle - spread, 180);
+        fireSpecial(baseAngle, 180);
+        fireSpecial(baseAngle + spread, 180);
+        break;
+      }
+      case 'cross': {
+        fireSpecial(baseAngle, 250);
+        fireSpecial(baseAngle + Math.PI / 2, 250);
+        fireSpecial(baseAngle + Math.PI, 250);
+        fireSpecial(baseAngle - Math.PI / 2, 250);
+        break;
+      }
+      case 'converge': {
+        const count = special.count ?? 5;
+        const spread = 20 * (Math.PI / 180);
+        const half = (count - 1) / 2;
+        for (let i = 0; i < count; i++) {
+          const t = half === 0 ? 0 : (i / half) - 1;
+          fireSpecial(baseAngle + t * spread, 250);
+        }
+        break;
+      }
+      case 'doubleRing': {
+        const count = special.count ?? 10;
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2;
+          fireSpecial(a, 210);
+          fireSpecial(a + Math.PI / count, 190);
+        }
+        break;
+      }
+    }
+
+    this.showBossSkillName(special.name);
+  }
+
+  private showBossSkillName(name: string): void {
+    this.bossSkillText?.destroy();
+    this.bossSkillText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, name.toUpperCase(), {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '18px',
+      fontStyle: '900',
+      color: '#ff44aa',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(160);
+
+    this.tweens.add({
+      targets: this.bossSkillText,
+      alpha: 0,
+      duration: 1800,
+      onComplete: () => {
+        this.bossSkillText?.destroy();
+        this.bossSkillText = undefined;
+      },
+    });
+  }
+
+  private updateBossChargeRing(boss: BossShip): void {
+    if (!boss.isCharging()) {
+      this.bossChargeRing?.clear();
+      return;
+    }
+
+    if (!this.bossChargeRing) {
+      this.bossChargeRing = this.add.graphics().setDepth(9);
+    }
+
+    this.bossChargeRing.clear();
+    this.bossChargeRing.lineStyle(3, 0xff2244, 0.85);
+    this.bossChargeRing.strokeCircle(boss.x, boss.y, 42);
+  }
+
   private updateBoss(time: number): void {
     this.bossShips.children.each((child) => {
-      (child as BossShip).tryFire(time, this.player.x, this.player.y);
+      const boss = child as BossShip;
+      boss.updateMovement();
+      boss.updateSpecial(time);
+      boss.tryFire(time, this.player.x, this.player.y);
+      this.updateBossChargeRing(boss);
       return true;
     });
   }
@@ -1240,8 +1460,8 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  private fireEnemyLaser(x: number, y: number, angle: number): void {
-    spawnEnemyLaser(this.enemyLasers, x, y, angle);
+  private fireEnemyLaser(x: number, y: number, angle: number, options?: EnemyLaserOptions): void {
+    spawnEnemyLaser(this.enemyLasers, x, y, angle, options);
   }
 
   private spawnSpiderShip(): void {
@@ -1331,6 +1551,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnExplosion(x: number, y: number, count: number): void {
+    playSfx('explosion');
     const emitter = this.add.particles(x, y, 'particle', {
       speed: { min: 60, max: 200 },
       scale: { start: 1, end: 0 },
@@ -1389,6 +1610,7 @@ export class GameScene extends Phaser.Scene {
     if (!shouldFire || !this.player.canFire(time)) return;
 
     this.player.consumeFire(time);
+    playSfx('shoot');
     const { x, y } = this.player.getBulletSpawnPoint();
     const pattern = this.player.getFirePattern();
 
@@ -1486,10 +1708,14 @@ export class GameScene extends Phaser.Scene {
     if (
       this.bossActive &&
       !this.bossDefeated &&
-      this.activeBossConfig &&
+      this.activeBossDefinition &&
       this.bossShips.countActive(true) === 0
     ) {
-      this.createBossInstance(this.activeBossConfig, this.bossHealthRemaining);
+      this.createBossInstance(
+        this.activeBossDefinition,
+        this.bossHealthRemaining,
+        this.bossMaxHealth,
+      );
     }
 
     this.lootBoxes.children.each((child) => {
