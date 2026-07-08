@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { getEquippedSkinTextureKey } from '../playerSkins';
 import {
   buildFirePattern,
   computePlayerPowerScore,
@@ -11,7 +12,6 @@ import {
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly baseMaxSpeed = 280;
-  private readonly drag = 600;
   private lastFired = 0;
   private thruster?: Phaser.GameObjects.Particles.ParticleEmitter;
   private isMoving = false;
@@ -26,12 +26,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private ownedWeaponIds: string[] = [];
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'rocket');
+    super(scene, x, y, getEquippedSkinTextureKey());
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
     this.setCollideWorldBounds(true);
-    this.setDrag(this.drag);
+    this.setDrag(0);
     this.applySpeedMultiplier();
     this.setSize(20, 36);
     this.setOffset(6, 8);
@@ -169,14 +169,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.isMoving = true;
     const nx = vx / len;
     const ny = vy / len;
-    this.setAcceleration(nx * 800, ny * 800);
+    const speed = this.baseMaxSpeed * this.loadout.speedMultiplier;
+    this.setVelocity(nx * speed, ny * speed);
 
     const angle = Phaser.Math.RadToDeg(Math.atan2(ny, nx)) + 90;
     this.setRotation(Phaser.Math.DegToRad(angle));
   }
 
   stopMove(): void {
-    this.setAcceleration(0, 0);
+    this.setVelocity(0, 0);
     this.isMoving = false;
   }
 

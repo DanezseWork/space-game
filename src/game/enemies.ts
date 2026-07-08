@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ESCALATION_START_SCORE, getDifficultyTier, getEscalationLevel } from './difficulty';
+import { getEscalationLevel } from './difficulty';
 
 export type EnemyKind = 'spider' | 'seeker' | 'wasp' | 'turret';
 
@@ -34,23 +34,13 @@ const ENEMY_BASE_MAX: Record<EnemyKind, number> = {
 /** Minimum ms between any enemy spawn attempt. */
 export const ENEMY_SPAWN_TICK_MS = 2500;
 
+/** Survival score bands: 0-999 none, 1000+ spider, 2000+ seeker, 4000+ wasp, 5000+ turret. */
 export function getUnlockedEnemyKinds(score: number): EnemyKind[] {
   const kinds: EnemyKind[] = [];
-  const tier = getDifficultyTier(score);
-
-  if (tier === 'medium' || score >= ESCALATION_START_SCORE) {
-    kinds.push('spider');
-  }
-  if (score > 2000) {
-    kinds.push('seeker');
-  }
-  if (score >= 4000) {
-    kinds.push('wasp');
-  }
-  if (score >= 5000) {
-    kinds.push('turret');
-  }
-
+  if (score >= 1000) kinds.push('spider');
+  if (score >= 2000) kinds.push('seeker');
+  if (score >= 4000) kinds.push('wasp');
+  if (score >= 5000) kinds.push('turret');
   return kinds;
 }
 
@@ -69,7 +59,7 @@ export function getMaxOnScreen(kind: EnemyKind, score: number): number {
 
   switch (kind) {
     case 'spider':
-      if (score >= ESCALATION_START_SCORE) max += level;
+      max += level;
       break;
     case 'seeker':
       max += Math.floor(level / 2);
@@ -90,9 +80,9 @@ function getEnemyWeight(kind: EnemyKind, score: number): number {
   const level = getEscalationLevel(score);
   switch (kind) {
     case 'spider':
-      return score >= ESCALATION_START_SCORE ? 3 + level : 4;
+      return score >= 1000 ? 3 + level : 0;
     case 'seeker':
-      return 3 + Math.floor(level / 2);
+      return score >= 2000 ? 3 + Math.floor(level / 2) : 0;
     case 'wasp':
       return score >= 4000 ? 4 + level : 0;
     case 'turret':

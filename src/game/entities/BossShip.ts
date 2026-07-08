@@ -36,8 +36,9 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
     private onSpecial: BossSpecialCallback,
     healthOverride?: number,
     maxHealthOverride?: number,
+    pointsOverride?: number,
   ) {
-    super(scene, x, y, 'boss-ship');
+    super(scene, x, y, definition.textureKey);
 
     this.definition = definition;
     this.bossName = definition.bossName;
@@ -46,7 +47,7 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
     this.velocityY = definition.velocityY;
     this.driftX = definition.driftX;
     this.bodyDamage = definition.bodyDamage;
-    this.points = definition.points;
+    this.points = pointsOverride ?? definition.points;
     this.fireCooldown = definition.fireCooldown;
     this.fanEvery = definition.fanEvery;
     this.fanSpreadRad = (definition.fanSpreadDeg * Math.PI) / 180;
@@ -58,16 +59,19 @@ export class BossShip extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setImmovable(true);
 
-    this.setCircle(28);
+    this.setCircle(definition.hitRadius ?? 28);
     this.setDepth(8);
     this.setVelocity(definition.driftX, definition.velocityY);
     this.clearTint();
 
+    const baseScale = definition.baseScale ?? 1;
+    let healthScale = 1;
     if (this.maxHealth >= 300) {
-      this.setScale(1.3);
+      healthScale = 1.1;
     } else if (this.maxHealth >= 200) {
-      this.setScale(1.15);
+      healthScale = 1.05;
     }
+    this.setScale(baseScale * healthScale);
 
     this.specialCooldownAt = scene.time.now + definition.special.cooldownMs;
   }

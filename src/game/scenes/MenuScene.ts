@@ -6,10 +6,14 @@ import { quitGame } from '../quitGame';
 import { getAutoFire } from '../settings';
 import { createMenuButton } from '../ui/MenuButtons';
 import { createSettingsPanel } from '../ui/SettingsPanel';
+import { createAlmanacPanel } from '../ui/AlmanacPanel';
+import { createShopPanel } from '../ui/ShopPanel';
 
 export class MenuScene extends Phaser.Scene {
   private quitOverlay?: Phaser.GameObjects.Container;
   private settingsPanel?: Phaser.GameObjects.Container;
+  private almanacPanel?: Phaser.GameObjects.Container;
+  private shopPanel?: Phaser.GameObjects.Container;
   constructor() {
     super({ key: 'MenuScene' });
   }
@@ -99,12 +103,14 @@ export class MenuScene extends Phaser.Scene {
 
   private createActionButtons(): void {
     const btnHeight = 48;
-    const gap = 20;
+    const gap = 14;
     const bottomPad = 48;
 
     const quitY = GAME_HEIGHT - bottomPad - btnHeight / 2;
     const settingsY = quitY - btnHeight - gap;
-    const launchY = settingsY - btnHeight - gap;
+    const shopY = settingsY - btnHeight - gap;
+    const almanacY = shopY - btnHeight - gap;
+    const launchY = almanacY - btnHeight - gap;
 
     const { container: launchBtn } = createMenuButton(this, {
       label: 'LAUNCH',
@@ -126,6 +132,30 @@ export class MenuScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+
+    const { container: almanacBtn } = createMenuButton(this, {
+      label: 'ALMANAC',
+      y: almanacY,
+      color: 0x8899bb,
+      onClick: () => {
+        initAudio();
+        playSfx('ui');
+        this.showAlmanacPanel();
+      },
+    });
+    almanacBtn.setX(GAME_WIDTH / 2);
+
+    const { container: shopBtn } = createMenuButton(this, {
+      label: 'SHOP',
+      y: shopY,
+      color: 0x8899bb,
+      onClick: () => {
+        initAudio();
+        playSfx('ui');
+        this.showShopPanel();
+      },
+    });
+    shopBtn.setX(GAME_WIDTH / 2);
 
     const { container: settingsBtn } = createMenuButton(this, {
       label: 'SETTINGS',
@@ -149,7 +179,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private showSettingsPanel(): void {
-    if (this.settingsPanel || this.quitOverlay) return;
+    if (this.settingsPanel || this.almanacPanel || this.shopPanel || this.quitOverlay) return;
 
     const panel = createSettingsPanel(this, 300, {
       onBack: () => {
@@ -160,6 +190,30 @@ export class MenuScene extends Phaser.Scene {
       onMusicVolumeChange: () => applyAudioSettings(),
     });
     this.settingsPanel = panel.root;
+  }
+
+  private showAlmanacPanel(): void {
+    if (this.almanacPanel || this.settingsPanel || this.shopPanel || this.quitOverlay) return;
+
+    const panel = createAlmanacPanel(this, 300, {
+      onBack: () => {
+        panel.destroy();
+        this.almanacPanel = undefined;
+      },
+    });
+    this.almanacPanel = panel.root;
+  }
+
+  private showShopPanel(): void {
+    if (this.shopPanel || this.almanacPanel || this.settingsPanel || this.quitOverlay) return;
+
+    const panel = createShopPanel(this, 300, {
+      onBack: () => {
+        panel.destroy();
+        this.shopPanel = undefined;
+      },
+    });
+    this.shopPanel = panel.root;
   }
 
   private showQuitConfirm(): void {

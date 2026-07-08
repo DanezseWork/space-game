@@ -1,20 +1,35 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { getGoldAsteroidCoinReward } from '../coinDrops';
 
 export type AsteroidSize = 'lg' | 'md' | 'sm';
+export type AsteroidVariant = 'normal' | 'gold';
 
 export interface AsteroidConfig {
   size: AsteroidSize;
+  variant?: AsteroidVariant;
   x: number;
   y: number;
   velocityX: number;
   velocityY: number;
 }
 
-const ASTEROID_DATA: Record<AsteroidSize, { texture: string; points: number; health: number; speed: number }> = {
+export const ASTEROID_DATA: Record<AsteroidSize, { texture: string; points: number; health: number; speed: number }> = {
   lg: { texture: 'asteroid-lg', points: 30, health: 3, speed: 110 },
   md: { texture: 'asteroid-md', points: 20, health: 2, speed: 150 },
   sm: { texture: 'asteroid-sm', points: 10, health: 1, speed: 200 },
+};
+
+export const GOLD_ASTEROID_TEXTURES: Record<AsteroidSize, string> = {
+  lg: 'asteroid-gold-lg',
+  md: 'asteroid-gold-md',
+  sm: 'asteroid-gold-sm',
+};
+
+export const GOLD_ASTEROID_HEALTH: Record<AsteroidSize, number> = {
+  lg: 20,
+  md: 15,
+  sm: 10,
 };
 
 export const ASTEROID_DAMAGE: Record<AsteroidSize, number> = {
@@ -25,15 +40,23 @@ export const ASTEROID_DAMAGE: Record<AsteroidSize, number> = {
 
 export class Asteroid extends Phaser.Physics.Arcade.Sprite {
   readonly size: AsteroidSize;
+  readonly variant: AsteroidVariant;
+  readonly coinReward: number;
   health: number;
   readonly points: number;
 
   constructor(scene: Phaser.Scene, config: AsteroidConfig) {
     const data = ASTEROID_DATA[config.size];
-    super(scene, config.x, config.y, data.texture);
+    const variant = config.variant ?? 'normal';
+    const isGold = variant === 'gold';
+    const texture = isGold ? GOLD_ASTEROID_TEXTURES[config.size] : data.texture;
+
+    super(scene, config.x, config.y, texture);
 
     this.size = config.size;
-    this.health = data.health;
+    this.variant = variant;
+    this.coinReward = isGold ? getGoldAsteroidCoinReward(config.size) : 0;
+    this.health = isGold ? GOLD_ASTEROID_HEALTH[config.size] : data.health;
     this.points = data.points;
 
     scene.add.existing(this);
@@ -46,6 +69,14 @@ export class Asteroid extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(config.velocityX, config.velocityY);
     this.setAngularVelocity(Phaser.Math.Between(-120, 120));
     this.setDepth(5);
+
+    if (isGold) {
+      this.setTint(0xffee88);
+    }
+  }
+
+  get isGold(): boolean {
+    return this.variant === 'gold';
   }
 
   takeHit(): boolean {
