@@ -1,3 +1,5 @@
+import type { BossAppearanceId } from './bossAppearances';
+
 export type BossSpecialPattern =
   | 'beam'
   | 'fan'
@@ -25,6 +27,10 @@ export interface BossDefinition {
   level: number;
   themeId: string;
   bossName: string;
+  textureKey: string;
+  appearanceId: BossAppearanceId;
+  baseScale?: number;
+  hitRadius?: number;
   baseHealth: number;
   bodyDamage: number;
   fireCooldown: number;
@@ -43,6 +49,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 1,
     themeId: 'earth',
     bossName: 'Orbital Sentinel',
+    textureKey: 'boss-ship-earth',
+    appearanceId: 'orbitalSentinel',
+    baseScale: 1,
+    hitRadius: 26,
     baseHealth: 120,
     bodyDamage: 6,
     fireCooldown: 2200,
@@ -58,6 +68,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 2,
     themeId: 'moon',
     bossName: 'Lunar Crawler',
+    textureKey: 'boss-ship-moon',
+    appearanceId: 'lunarCrawler',
+    baseScale: 1.05,
+    hitRadius: 30,
     baseHealth: 140,
     bodyDamage: 6,
     fireCooldown: 1600,
@@ -73,6 +87,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 3,
     themeId: 'venus',
     bossName: 'Venusian Swarm Queen',
+    textureKey: 'boss-ship-venus',
+    appearanceId: 'swarmQueen',
+    baseScale: 1.1,
+    hitRadius: 28,
     baseHealth: 160,
     bodyDamage: 7,
     fireCooldown: 1400,
@@ -88,6 +106,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 4,
     themeId: 'mercury',
     bossName: 'Solar Flare Golem',
+    textureKey: 'boss-ship-mercury',
+    appearanceId: 'solarGolem',
+    baseScale: 1.1,
+    hitRadius: 28,
     baseHealth: 190,
     bodyDamage: 7,
     fireCooldown: 1500,
@@ -103,6 +125,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 5,
     themeId: 'mars',
     bossName: 'Martian War Titan',
+    textureKey: 'boss-ship-mars',
+    appearanceId: 'warTitan',
+    baseScale: 1.2,
+    hitRadius: 30,
     baseHealth: 240,
     bodyDamage: 8,
     fireCooldown: 1300,
@@ -118,6 +144,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 6,
     themeId: 'beltEntry',
     bossName: 'Belt Marauder',
+    textureKey: 'boss-ship-beltEntry',
+    appearanceId: 'beltMarauder',
+    baseScale: 1.05,
+    hitRadius: 27,
     baseHealth: 176,
     bodyDamage: 7,
     fireCooldown: 1800,
@@ -133,6 +163,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 7,
     themeId: 'vesta',
     bossName: 'Vesta Crusher',
+    textureKey: 'boss-ship-vesta',
+    appearanceId: 'vestaCrusher',
+    baseScale: 1.1,
+    hitRadius: 28,
     baseHealth: 182,
     bodyDamage: 8,
     fireCooldown: 1550,
@@ -148,6 +182,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 8,
     themeId: 'pallas',
     bossName: 'Pallas Weaver',
+    textureKey: 'boss-ship-pallas',
+    appearanceId: 'pallasWeaver',
+    baseScale: 1.1,
+    hitRadius: 30,
     baseHealth: 188,
     bodyDamage: 8,
     fireCooldown: 1450,
@@ -163,6 +201,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 9,
     themeId: 'ceres',
     bossName: 'Ceres Guardian',
+    textureKey: 'boss-ship-ceres',
+    appearanceId: 'ceresGuardian',
+    baseScale: 1.15,
+    hitRadius: 30,
     baseHealth: 196,
     bodyDamage: 8,
     fireCooldown: 1400,
@@ -178,6 +220,10 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     level: 10,
     themeId: 'beltFinale',
     bossName: 'Belt Overlord',
+    textureKey: 'boss-ship-beltFinale',
+    appearanceId: 'beltOverlord',
+    baseScale: 1.35,
+    hitRadius: 32,
     baseHealth: 320,
     bodyDamage: 9,
     fireCooldown: 1100,
@@ -190,8 +236,6 @@ export const BOSS_DEFINITIONS: Record<number, BossDefinition> = {
     special: { name: 'Overlord Extinction', cooldownMs: 6500, chargeMs: 1600, pattern: 'doubleRing', count: 10 },
   },
 };
-
-export const BOSS_SPECIAL_DAMAGE = 10;
 
 export function getBossDefinition(level: number): BossDefinition {
   return BOSS_DEFINITIONS[level] ?? BOSS_DEFINITIONS[1];

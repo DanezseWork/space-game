@@ -1,8 +1,22 @@
 import Phaser from 'phaser';
+import { BOSS_DEFINITIONS as WORLD1_BOSSES } from '../world1/bosses';
+import { drawBossAppearance as drawWorld1Boss, getBossAppearancePalette as getWorld1BossPalette } from '../world1/bossAppearances';
+import { STORY_ENEMY_DEFINITIONS as WORLD1_STORY_ENEMIES } from '../world1/storyEnemyDefinitions';
+import { drawStoryEnemyAppearance as drawWorld1StoryEnemy, getStoryEnemyAppearancePalette as getWorld1StoryEnemyPalette } from '../world1/storyEnemyAppearances';
+import { BOSS_DEFINITIONS as WORLD2_BOSSES } from '../world2/bosses';
+import { drawBossAppearance as drawWorld2Boss, getBossAppearancePalette as getWorld2BossPalette } from '../world2/bossAppearances';
+import { STORY_ENEMY_DEFINITIONS as WORLD2_STORY_ENEMIES } from '../world2/storyEnemyDefinitions';
+import { drawStoryEnemyAppearance as drawWorld2StoryEnemy, getStoryEnemyAppearancePalette as getWorld2StoryEnemyPalette } from '../world2/storyEnemyAppearances';
+import { PLAYER_SKINS } from '../playerSkins';
+import { drawRocketSkin } from '../rocketAppearances';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
     super({ key: 'BootScene' });
+  }
+
+  preload(): void {
+    this.load.image('shop-skins-tab-icon', '/assets/shop-skins-tab.png');
   }
 
   create(): void {
@@ -11,35 +25,36 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createTextures(): void {
-    this.createRocketTexture();
+    this.createRocketSkinTextures();
     this.createBulletTexture();
     this.createAsteroidTextures();
     this.createStarTexture();
     this.createParticleTexture();
+    this.createSmokeParticleTexture();
     this.createHeartTexture();
     this.createPowerStarTexture();
     this.createSpiderShipTexture();
     this.createEnemyLaserTexture();
+    this.createBossSpecialLaserTexture();
     this.createLootBoxTexture();
     this.createHeavyBulletTexture();
     this.createSeekerDroneTexture();
     this.createKamikazeWaspTexture();
     this.createPlasmaTurretTexture();
-    this.createBossShipTexture();
+    this.createBossShipTextures();
+    this.createStoryEnemyTextures();
+    this.createWormholeTexture();
+    this.createWarpPanelTexture();
+    this.createCometTextures();
   }
 
-  private createRocketTexture(): void {
-    const g = this.make.graphics({ x: 0, y: 0 }, false);
-    g.fillStyle(0x1a1f3a);
-    g.fillTriangle(16, 0, 0, 40, 32, 40);
-    g.fillStyle(0x00d4ff);
-    g.fillTriangle(16, 8, 6, 36, 26, 36);
-    g.fillStyle(0xff6b35);
-    g.fillTriangle(10, 40, 16, 52, 22, 40);
-    g.fillStyle(0xffcc00);
-    g.fillTriangle(13, 42, 16, 50, 19, 42);
-    g.generateTexture('rocket', 32, 52);
-    g.destroy();
+  private createRocketSkinTextures(): void {
+    for (const skin of PLAYER_SKINS) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      drawRocketSkin(g, skin.appearanceId);
+      g.generateTexture(skin.textureKey, 32, 52);
+      g.destroy();
+    }
   }
 
   private createBulletTexture(): void {
@@ -54,33 +69,45 @@ export class BootScene extends Phaser.Scene {
 
   private createAsteroidTextures(): void {
     const sizes = [
-      { key: 'asteroid-lg', radius: 28, color: 0x8b7355 },
-      { key: 'asteroid-md', radius: 20, color: 0xa0886a },
-      { key: 'asteroid-sm', radius: 12, color: 0xb89b7a },
+      { key: 'asteroid-lg', goldKey: 'asteroid-gold-lg', radius: 28, color: 0x8b7355, goldColor: 0xffcc00 },
+      { key: 'asteroid-md', goldKey: 'asteroid-gold-md', radius: 20, color: 0xa0886a, goldColor: 0xffcc00 },
+      { key: 'asteroid-sm', goldKey: 'asteroid-gold-sm', radius: 12, color: 0xb89b7a, goldColor: 0xffcc00 },
     ];
 
-    for (const { key, radius, color } of sizes) {
+    for (const { key, goldKey, radius, color, goldColor } of sizes) {
       const size = radius * 2 + 4;
-      const g = this.make.graphics({ x: 0, y: 0 }, false);
       const cx = size / 2;
       const cy = size / 2;
-      g.fillStyle(color);
-      g.beginPath();
       const points = 8;
+      const radii: number[] = [];
       for (let i = 0; i < points; i++) {
-        const angle = (i / points) * Math.PI * 2;
-        const r = radius * (0.75 + Math.random() * 0.35);
-        const x = cx + Math.cos(angle) * r;
-        const y = cy + Math.sin(angle) * r;
-        if (i === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
+        radii.push(radius * (0.75 + Math.random() * 0.35));
       }
-      g.closePath();
-      g.fillPath();
-      g.fillStyle(0x000000, 0.25);
-      g.fillCircle(cx - radius * 0.2, cy - radius * 0.15, radius * 0.25);
-      g.generateTexture(key, size, size);
-      g.destroy();
+
+      const drawAsteroid = (textureKey: string, fillColor: number, highlightColor: number) => {
+        const g = this.make.graphics({ x: 0, y: 0 }, false);
+        g.fillStyle(fillColor);
+        g.beginPath();
+        for (let i = 0; i < points; i++) {
+          const angle = (i / points) * Math.PI * 2;
+          const r = radii[i];
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (i === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
+        }
+        g.closePath();
+        g.fillPath();
+        g.fillStyle(highlightColor, 0.45);
+        g.fillCircle(cx - radius * 0.15, cy - radius * 0.12, radius * 0.22);
+        g.fillStyle(0x000000, 0.2);
+        g.fillCircle(cx - radius * 0.2, cy - radius * 0.15, radius * 0.18);
+        g.generateTexture(textureKey, size, size);
+        g.destroy();
+      };
+
+      drawAsteroid(key, color, 0x000000);
+      drawAsteroid(goldKey, goldColor, 0xffee88);
     }
   }
 
@@ -97,6 +124,20 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xffffff);
     g.fillCircle(4, 4, 4);
     g.generateTexture('particle', 8, 8);
+    g.destroy();
+  }
+
+  private createSmokeParticleTexture(): void {
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0xffffff, 0.1);
+    g.fillEllipse(28, 12, 52, 22);
+    g.fillStyle(0xffffff, 0.22);
+    g.fillEllipse(28, 12, 38, 16);
+    g.fillStyle(0xffffff, 0.38);
+    g.fillEllipse(28, 12, 24, 10);
+    g.fillStyle(0xffffff, 0.5);
+    g.fillEllipse(28, 12, 12, 5);
+    g.generateTexture('smoke-particle', 56, 24);
     g.destroy();
   }
 
@@ -178,6 +219,18 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xff8899, 0.9);
     g.fillRoundedRect(2, 2, 4, 8, 1);
     g.generateTexture('enemy-laser', 8, 20);
+    g.destroy();
+  }
+
+  private createBossSpecialLaserTexture(): void {
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0x6611bb, 1);
+    g.fillRoundedRect(0, 0, 10, 24, 2);
+    g.fillStyle(0xaa44ff, 0.95);
+    g.fillRoundedRect(2, 2, 6, 12, 1);
+    g.fillStyle(0xddbbff, 0.85);
+    g.fillRoundedRect(4, 4, 2, 8, 1);
+    g.generateTexture('boss-special-laser', 10, 24);
     g.destroy();
   }
 
@@ -263,29 +316,86 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  private createBossShipTexture(): void {
+  private createBossShipTextures(): void {
+    for (const definition of Object.values(WORLD1_BOSSES)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const palette = getWorld1BossPalette(definition.themeId);
+      drawWorld1Boss(g, definition.appearanceId, palette);
+      g.generateTexture(definition.textureKey, 64, 64);
+      g.destroy();
+    }
+    for (const definition of Object.values(WORLD2_BOSSES)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const palette = getWorld2BossPalette(definition.themeId);
+      drawWorld2Boss(g, definition.appearanceId, palette);
+      g.generateTexture(definition.textureKey, 64, 64);
+      g.destroy();
+    }
+  }
+
+  private createStoryEnemyTextures(): void {
+    for (const definition of Object.values(WORLD1_STORY_ENEMIES)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const palette = getWorld1StoryEnemyPalette(definition.themeId);
+      drawWorld1StoryEnemy(g, definition.appearanceId, palette);
+      g.generateTexture(definition.textureKey, 32, 36);
+      g.destroy();
+    }
+    for (const definition of Object.values(WORLD2_STORY_ENEMIES)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const palette = getWorld2StoryEnemyPalette(definition.themeId);
+      drawWorld2StoryEnemy(g, definition.appearanceId, palette);
+      g.generateTexture(definition.textureKey, 32, 36);
+      g.destroy();
+    }
+  }
+
+  private createWormholeTexture(): void {
     const g = this.make.graphics({ x: 0, y: 0 }, false);
     const cx = 32;
-    const cy = 34;
-
-    g.fillStyle(0x331111, 1);
-    g.fillEllipse(cx, cy, 56, 48);
-    g.lineStyle(3, 0xffcc00, 1);
-    g.strokeEllipse(cx, cy, 56, 48);
-
-    g.fillStyle(0x881111, 1);
-    g.fillTriangle(cx, cy - 28, cx - 22, cy + 10, cx + 22, cy + 10);
-
-    g.fillStyle(0xff2244, 0.9);
-    g.fillCircle(cx, cy - 4, 10);
-    g.fillStyle(0xffcc00, 0.8);
-    g.fillCircle(cx, cy - 6, 5);
-
-    g.lineStyle(2, 0x662222, 1);
-    g.lineBetween(cx - 28, cy + 8, cx - 44, cy + 20);
-    g.lineBetween(cx + 28, cy + 8, cx + 44, cy + 20);
-
-    g.generateTexture('boss-ship', 64, 64);
+    const cy = 32;
+    g.lineStyle(4, 0x8844ff, 0.9);
+    g.strokeCircle(cx, cy, 26);
+    g.lineStyle(2, 0xaa66ff, 0.7);
+    g.strokeCircle(cx, cy, 18);
+    g.fillStyle(0x220044, 0.6);
+    g.fillCircle(cx, cy, 14);
+    g.fillStyle(0xcc88ff, 0.85);
+    g.fillCircle(cx, cy, 6);
+    g.generateTexture('wormhole', 64, 64);
     g.destroy();
+  }
+
+  private createWarpPanelTexture(): void {
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    const s = 48;
+    g.fillStyle(0x004466, 0.5);
+    g.fillRoundedRect(0, 0, s, s, 6);
+    g.lineStyle(3, 0x00d4ff, 0.95);
+    g.strokeRoundedRect(4, 4, s - 8, s - 8, 4);
+    g.fillStyle(0x00d4ff, 0.4);
+    g.fillRoundedRect(10, 10, s - 20, s - 20, 3);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillTriangle(s / 2, 14, s / 2 - 8, s - 14, s / 2 + 8, s - 14);
+    g.generateTexture('warp-panel', s, s);
+    g.destroy();
+  }
+
+  private createCometTextures(): void {
+    const drawComet = (key: string, core: number, tail: number) => {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(tail, 0.35);
+      g.fillTriangle(8, 16, 28, 8, 28, 24);
+      g.fillStyle(tail, 0.2);
+      g.fillTriangle(0, 16, 16, 10, 16, 22);
+      g.fillStyle(core, 1);
+      g.fillCircle(30, 16, 10);
+      g.fillStyle(0xffffff, 0.7);
+      g.fillCircle(27, 13, 4);
+      g.generateTexture(key, 40, 32);
+      g.destroy();
+    };
+    drawComet('comet', 0x88aaff, 0x4466aa);
+    drawComet('comet-gold', 0xffcc44, 0xcc8822);
   }
 }

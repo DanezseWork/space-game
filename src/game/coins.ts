@@ -22,3 +22,24 @@ export function addCoins(amount: number): number {
 export function formatCoinsLabel(): string {
   return `COINS: ${getCoins()}`;
 }
+
+export function formatRunCoinsLabel(runCoins: number): string {
+  return runCoins > 0 ? `COINS +${runCoins}` : 'COINS 0';
+}
+
+export function canAfford(amount: number): boolean {
+  return getCoins() >= Math.max(0, amount);
+}
+
+export function spendCoins(amount: number): boolean {
+  const cost = Math.max(0, amount);
+  if (!canAfford(cost)) return false;
+
+  const next = getCoins() - cost;
+  try {
+    localStorage.setItem(STORAGE_KEY, String(next));
+  } catch {
+    return false;
+  }
+  return true;
+}
